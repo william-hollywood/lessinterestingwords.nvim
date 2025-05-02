@@ -12,20 +12,22 @@ m.next = 1
 
 local get_default_config = function()
     return {
-        colors = { '#aeee00', '#ff0000', '#0000ff', '#b88823', '#ffa724', '#ff2c4b' },
-        search_count = true,
-        navigation = true,
-        scroll_center = true,
-        search_key = "<leader>m",
-        cancel_search_key = "<leader>M",
-        color_key = "<leader>k",
-        cancel_color_key = "<leader>K",
+        color_key = "k",
+        cancel_color_key = "K",
         select_mode = "random", -- random or loop
     }
 end
 
 local init_colors = function()
-    for i, v in pairs(m.config.colors) do
+    local colors = {}
+    for r=80,240,80 do
+        for g=80,240,80 do
+            for b=80,240,80 do
+                table.insert(colors, string.format("#%02x%02x%02x", r, g, b))
+            end
+        end
+    end
+    for i, v in pairs(colors) do
         local color = "InterestingWord" .. i
 
         api.nvim_set_hl(0, color, { bg = v, fg = 'Black' })
@@ -33,7 +35,7 @@ local init_colors = function()
         m.capcity = m.capcity + 1
     end
     m.limits.min = 595129 + 1
-    m.limits.max = 595129 + #m.config.colors
+    m.limits.max = 595129 + #colors
 end
 
 local get_reg_ex = function(word)
@@ -216,65 +218,6 @@ local hide_search_count = function(bufnr)
     end
 end
 
-local scroll_timer = vim.loop.new_timer()
-local function scroll_up(cnt)
-    return vim.cmd("normal! " .. cnt .. "")
-end
-
-local function scroll_down(cnt)
-    return vim.cmd("normal! " .. cnt .. "")
-end
-
-local function stop_scrolling()
-    scroll_timer:stop()
-end
-
-local scroll_to_center = function()
-    local window_height = api.nvim_win_get_height(0)
-    local lines = fn.winline() - math.floor(window_height / 2)
-    if lines == 0 then
-        return
-    end
-    local up = lines > 0
-    lines = math.abs(lines)
-
-    local move_lines = function(n)
-        return math.floor(n / 5) + 1
-    end
-
-    local each_time = function()
-        local lines_bak = lines
-        local circles = 0
-        while lines_bak ~= 0 do
-            lines_bak = lines_bak - move_lines(lines_bak)
-            circles = circles + 1
-        end
-        local pseudo_total_time = 300 + 15 * math.min((lines - 11), 10) + lines
-        return math.floor(pseudo_total_time / circles)
-    end
-    local t = each_time()
-    local time_total = 0
-
-    local scroll_callback = function()
-        local cnt = move_lines(lines)
-        if lines == 0 then
-            stop_scrolling()
-            return
-        else
-            lines = lines - cnt
-        end
-
-        if up then
-            scroll_up(cnt)
-        else
-            scroll_down(cnt)
-        end
-        time_total = time_total + t
-    end
-
-    scroll_timer:start(t, t, vim.schedule_wrap(scroll_callback))
-end
-
 m.lualine_get = function()
     return m.search_count_cache
 end
@@ -308,9 +251,6 @@ m.init_search_count = function()
                 if event.match == "/" or event.match == "?" then
                     vim.defer_fn(function()
                         local searched = m.search_count(fn.getreg('/'))
-                        if searched and m.config.scroll_center then
-                            scroll_to_center()
-                        end
                     end, 100)
                 end
             end,
@@ -367,9 +307,6 @@ m.NavigateToWord = function(forward)
     end
     local n = fn.search(word, search_flag)
     if n ~= 0 then
-        if  m.config.scroll_center then
-            scroll_to_center()
-        end
     else
         vim.notify("Pattern not found: " .. filter(word))
         return
